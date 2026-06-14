@@ -7,8 +7,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  SERVER_IMAGE: ${{ inputs.owner }}/mattermost-team
-  MMCTL_IMAGE: ${{ inputs.owner }}/mattermost-mmctl
+  SERVER_IMAGE: ${{ github.repository_owner }}/mattermost-team
+  MMCTL_IMAGE: ${{ github.repository_owner }}/mattermost-mmctl
   VERSION: ${{ inputs.version }}
 
 jobs:
@@ -25,8 +25,8 @@ jobs:
       - uses: extractions/setup-just@v2
       - run: |
           just patch "$VERSION"
-          git commit -a -m "mattermost {{version}}"
-      - run: just release-rc
+          git diff --quiet || git commit -a -m "mattermost $VERSION"
+      - run: just release-rc "$VERSION"
 
   build:
     needs: prepare
@@ -46,12 +46,14 @@ jobs:
           ref: v${{ inputs.version }}-rc
           fetch-tags: true
       - uses: extractions/setup-just@v2
-      - env:
-          REGISTRY_USER: ${{ github.actor }}
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: just login
       - run: just build "$VERSION" "$ARCH"
-      - run: just push "$VERSION" "$ARCH"
+      - run: just export-images "$VERSION" "$ARCH" images
+      - uses: actions/upload-artifact@v4
+        with:
+          name: images-${{ inputs.version }}-${{ matrix.target.arch }}
+          path: images/
+          retention-days: 1
+          if-no-files-found: error
 
   merge:
     needs: build
@@ -60,10 +62,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v2
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: images-${{ inputs.version }}-*
+          path: images/
+          merge-multiple: true
       - env:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just login
+      - run: just load images
       - run: just assemble "$VERSION"
       - run: just publish-manifests "$VERSION"
 
@@ -80,5 +88,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
       - uses: extractions/setup-just@v2
-      - run: just verify-release "$VERSION"
+      - run: just verify-manifests "$VERSION"
       - run: just release "$VERSION"

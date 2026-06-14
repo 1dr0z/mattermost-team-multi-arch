@@ -52,6 +52,9 @@ patch version:
 _server_tag version arch=local_arch:
     @echo "{{ server_repo }}:{{ version }}-{{ arch }}"
 
+_mmctl_tag version arch=local_arch:
+    @echo "{{ mmctl_repo }}:{{ version }}-{{ arch }}"
+
 _build-server version target_arch=local_arch:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -71,7 +74,7 @@ _build-mmctl version target_arch=local_arch: (_build-server version target_arch)
     set -euo pipefail
 
     server_tag=`just _server_tag {{ version }} {{ target_arch }}`
-    mmctl_tag="{{ mmctl_repo }}:{{ version }}-{{ target_arch }}"
+    mmctl_tag=`just _mmctl_tag {{ version }}-{{ target_arch }}`
     podman build \
         --platform "linux/{{ target_arch }}" \
         --format docker \
@@ -83,12 +86,34 @@ _build-mmctl version target_arch=local_arch: (_build-server version target_arch)
 # build mattermost and mmctl images
 build version target_arch=local_arch: (_build-server version target_arch) (_build-mmctl version target_arch)
 
+# Export server + mmctl images
+export-images version arch dir="dist/images":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    server_tag=`just _server_tag {{ version }} {{ arch }}`
+    mmctl_tag=`just _mmctl_tag {{ version }} {{ arch }}`
+
+    mkdir -p "{{ dir }}"
+    podman save -o "{{ dir }}/server-{{ version }}-{{ arch }}.tar" "$server_tag"
+    podman save -o "{{ dir }}/mmctl-{{ version }}-{{ arch }}.tar" "$mmctl_tag"
+
+# Load image archives found under <dir> into local storage
+import-images dir="dist/images":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shopt -s nullglob
+
+    for f in "{{ dir }}"/*.tar; do
+        podman load -i "$f"
+    done
+
 # Push the images for version + arch to registry.
 push version arch:
     #!/usr/bin/env bash
     set -euo pipefail
-    podman push {{ registry_tls }} "{{ server_repo }}:{{ version }}-{{ arch }}"
-    podman push {{ registry_tls }} "{{ mmctl_repo }}:{{ version }}-{{ arch }}"
+    podman push {{ registry_tls }} `just _server_tag {{ version }} {{ arch }}`
+    podman push {{ registry_tls }} `just _mmctl_tag {{ version }} {{ arch }}`
 
 [no-exit-message]
 mattermost-versions:
@@ -192,8 +217,8 @@ verify-manifests version:
 
 # Tag and push a release candidate
 release-rc version:
-    git tag "v${{ version }}-rc"
-    git push --force origin "v${{ version }}-rc"
+    git tag "v{{ version }}-rc"
+    git push --force origin "v{{ version }}-rc"
 
 # Tag and push a release version
 release version: (verify-manifests version)
