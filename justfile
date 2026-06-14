@@ -7,13 +7,13 @@ server_repo := registry + "/" + lowercase(server_image)
 mmctl_repo := registry + "/" + lowercase(mmctl_image)
 
 # Local registries speak plain HTTP, so flip TLS verification off automatically.
-tls := if registry =~ '^(localhost|127\.0\.0\.1)' { "--tls-verify=false" } else { "" }
+is_local_registry := if registry =~ '^(localhost|127\.0\.0\.1)' { "true" } else { "false" }
+registry_tls := if is_local_registry == "true" { "--tls-verify=false" } else { "" }
 
 # local host architecture
 local_arch := if arch() == "aarch64" { "arm64" } else if arch() == "x86_64" { "amd64" } else { arch() }
 
 semver_re := '^[0-9]+\.[0-9]+\.[0-9]+$'
-
 
 _default:
     @just --list
@@ -22,6 +22,12 @@ _default:
 login:
     #!/usr/bin/env bash
     set -euo pipefail
+
+    if [[ "{{ is_local_registry }}" == "true" ]]; then
+        echo "Local registry does not support login" >&2
+        exit 0
+    fi
+
     : "${REGISTRY_USER:?set REGISTRY_USER}"
     : "${REGISTRY_TOKEN:?set REGISTRY_TOKEN}"
     echo "$REGISTRY_TOKEN" | podman login "{{ registry }}" -u "$REGISTRY_USER" --password-stdin
@@ -44,16 +50,16 @@ patch version:
         mattermost/Containerfile.upstream < mattermost/multi-arch.patch
 
 _server_tag version arch=local_arch:
-  @echo "{{server_repo}}:{{version}}-{{arch}}"
+    @echo "{{ server_repo }}:{{ version }}-{{ arch }}"
 
 _build-server version target_arch=local_arch:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    pkg="https://releases.mattermost.com/{{version}}/mattermost-team-{{version}}-linux-{{target_arch}}.tar.gz"
-    tag=`just _server_tag {{version}} {{target_arch}}`
+    pkg="https://releases.mattermost.com/{{ version }}/mattermost-team-{{ version }}-linux-{{ target_arch }}.tar.gz"
+    tag=`just _server_tag {{ version }} {{ target_arch }}`
     podman build \
-        --platform "linux/{{target_arch}}" \
+        --platform "linux/{{ target_arch }}" \
         --format docker \
         --build-arg MM_PACKAGE="$pkg" \
         --tag "$tag" \
@@ -64,10 +70,10 @@ _build-mmctl version target_arch=local_arch: (_build-server version target_arch)
     #!/usr/bin/env bash
     set -euo pipefail
 
-    server_tag=`just _server_tag {{version}} {{target_arch}}`
-    mmctl_tag="{{mmctl_repo}}:{{version}}-{{target_arch}}"
+    server_tag=`just _server_tag {{ version }} {{ target_arch }}`
+    mmctl_tag="{{ mmctl_repo }}:{{ version }}-{{ target_arch }}"
     podman build \
-        --platform "linux/{{target_arch}}" \
+        --platform "linux/{{ target_arch }}" \
         --format docker \
         --build-arg SERVER_IMAGE="$server_tag" \
         --tag "$mmctl_tag" \
@@ -81,24 +87,24 @@ build version target_arch=local_arch: (_build-server version target_arch) (_buil
 push version arch:
     #!/usr/bin/env bash
     set -euo pipefail
-    podman push {{tls}} "{{server_repo}}:{{version}}-{{arch}}"
-    podman push {{tls}} "{{mmctl_repo}}:{{version}}-{{arch}}"
+    podman push {{ registry_tls }} "{{ server_repo }}:{{ version }}-{{ arch }}"
+    podman push {{ registry_tls }} "{{ mmctl_repo }}:{{ version }}-{{ arch }}"
 
 [no-exit-message]
 mattermost-versions:
-  @git ls-remote --tags --refs https://github.com/mattermost/mattermost.git \
-        | awk '{print $2}' \
-        | sed 's|refs/tags/v||' \
-        | grep -E "{{ semver_re }}" \
-        | sort -V
+    @git ls-remote --tags --refs https://github.com/mattermost/mattermost.git \
+          | awk '{print $2}' \
+          | sed 's|refs/tags/v||' \
+          | grep -E "{{ semver_re }}" \
+          | sort -V
 
 # List versions that have already been built and published
 [no-exit-message]
 published-versions registry=server_repo:
-  @skopeo list-tags {{tls}} "docker://{{registry}}" 2>/dev/null \
-    | jq -r '.Tags[]' \
-    | grep -E "{{semver_re}}" \
-    | sort -V
+    @skopeo list-tags {{ registry_tls }} "docker://{{ registry }}" 2>/dev/null \
+      | jq -r '.Tags[]' \
+      | grep -E "{{ semver_re }}" \
+      | sort -V
 
 # Decide which versions to build based on upstream tags and published image versions
 missing-versions:
@@ -118,8 +124,8 @@ missing-versions:
     set_difference()  { comm -23 <(sort <<<"$1") <(sort <<<"$2"); }
 
     upstream_tags=$(just mattermost-versions)
-    server_tags=$(just published-versions "{{server_repo}}" || true)
-    mmctl_tags=$(just published-versions "{{mmctl_repo}}" || true)
+    server_tags=$(just published-versions "{{ server_repo }}" || true)
+    mmctl_tags=$(just published-versions "{{ mmctl_repo }}" || true)
 
     # floor = lowest published version.
     floor=$(head -n1 <<<"$server_tags")
@@ -141,30 +147,30 @@ missing-versions:
 assemble-manifest repo version:
     #!/usr/bin/env bash
     set -euo pipefail
-    list="{{repo}}:{{version}}"
+    list="{{ repo }}:{{ version }}"
     podman manifest rm "$list" 2>/dev/null || true
     podman manifest create "$list"
-    podman manifest add "$list" "{{repo}}:{{version}}-amd64"   # local if built here, else pulled
-    podman manifest add "$list" "{{repo}}:{{version}}-arm64"
+    podman manifest add "$list" "{{ repo }}:{{ version }}-amd64"   # local if built here, else pulled
+    podman manifest add "$list" "{{ repo }}:{{ version }}-arm64"
 
 # Assemble the multi-arch manifests for version
 assemble version: (assemble-manifest server_repo version) (assemble-manifest mmctl_repo version)
 
 # Push merged manifest to the registry
 push-manifest repo version:
-  #!/usr/bin/env bash
-  set -euo pipefail
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-  image="{{repo}}:{{version}}"
-  podman manifest push --all {{tls}} "$image" "docker://$image"
+    image="{{ repo }}:{{ version }}"
+    podman manifest push --all {{ registry_tls }} "$image" "docker://$image"
 
 # Publish the merged images
 publish-manifests version:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    just push-manifest {{server_repo}} {{version}}
-    just push-manifest {{mmctl_repo}} {{version}}
+    just push-manifest {{ server_repo }} {{ version }}
+    just push-manifest {{ mmctl_repo }} {{ version }}
 
 # Ensure a release version is valid
 verify-manifests version:
@@ -173,34 +179,42 @@ verify-manifests version:
 
     check() {
         local repo=$1 raw arches
-        raw=$(skopeo inspect {{tls}} --raw "docker://${repo}:{{version}}") \
-            || { echo "no manifest for ${repo}:{{version}}" >&2; return 1; }
+        raw=$(skopeo inspect {{ registry_tls }} --raw "docker://${repo}:{{ version }}") \
+            || { echo "no manifest for ${repo}:{{ version }}" >&2; return 1; }
 
         arches=$(jq -r '.manifests[].platform.architecture' <<<"$raw" | sort -u | paste -sd, -)
         [[ "$arches" == "amd64,arm64" ]] \
-            || { echo "${repo}:{{version}} arches = ${arches:-none}" >&2; return 1; }
+            || { echo "${repo}:{{ version }} arches = ${arches:-none}" >&2; return 1; }
     }
 
-    check "{{server_repo}}"
-    check "{{mmctl_repo}}"
+    check "{{ server_repo }}"
+    check "{{ mmctl_repo }}"
 
 # Tag and push a release candidate
 release-rc version:
-  git tag "v${{ version }}-rc"
-  git push --force origin "v${{ version }}-rc"
+    git tag "v${{ version }}-rc"
+    git push --force origin "v${{ version }}-rc"
 
 # Tag and push a release version
 release version: (verify-manifests version)
-  #!/usr/bin/env bash
-  set -euo pipefail
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-  tag="v{{version}}"
-  rc_tag="v{{version}}-rc"
+    tag="v{{ version }}"
+    rc_tag="v{{ version }}-rc"
 
-  # create release tag
-  git tag -a "$tag" -m "mattermost {{version}}" "$rc_tag"
-  git push origin "$tag"
+    # create release tag
+    git tag -a "$tag" -m "mattermost {{ version }}" "$rc_tag"
+    git push origin "$tag"
 
-  # delete release candidate tag
-  git tag -d "$rc_tag"
-  git push origin ":${rc_tag}"
+    # delete release candidate tag
+    git tag -d "$rc_tag"
+    git push origin ":${rc_tag}"
+
+actions *ARGS:
+    act schedule \
+      --container-architecture linux/amd64 \
+      --container-daemon-socket - \
+      -P ubuntu-24.04=catthehacker/ubuntu:act-24.04 \
+      -P ubuntu-24.04-arm=catthehacker/ubuntu:act-24.04 \
+      {{ ARGS }}
