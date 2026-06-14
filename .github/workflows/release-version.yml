@@ -1,0 +1,84 @@
+name: release-version
+
+on:
+  workflow_call:
+    inputs:
+      version: { required: true, type: string }
+
+env:
+  REGISTRY: ghcr.io
+  SERVER_IMAGE: ${{ inputs.owner }}/mattermost-team
+  MMCTL_IMAGE: ${{ inputs.owner }}/mattermost-mmctl
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  prepare:
+    permissions: { contents: write }
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - uses: extractions/setup-just@v2
+      - run: |
+          just patch "$VERSION"
+          git commit -a -m "mattermost {{version}}"
+      - run: just release-rc
+
+  build:
+    needs: prepare
+    permissions: { contents: read, packages: write }
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { runner: ubuntu-24.04, arch: amd64 }
+          - { runner: ubuntu-24.04-arm, arch: arm64 }
+    runs-on: ${{ matrix.target.runner }}
+    env:
+      ARCH: ${{ matrix.target.arch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}-rc
+          fetch-tags: true
+      - uses: extractions/setup-just@v2
+      - env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: just login
+      - run: just build "$VERSION" "$ARCH"
+      - run: just push "$VERSION" "$ARCH"
+
+  merge:
+    needs: build
+    permissions: { contents: read, packages: write }
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: just login
+      - run: just assemble "$VERSION"
+      - run: just publish-manifests "$VERSION"
+
+  release:
+    needs: merge
+    permissions: { contents: write, packages: read }
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}-rc
+          fetch-tags: true
+      - run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - uses: extractions/setup-just@v2
+      - run: just verify-release "$VERSION"
+      - run: just release "$VERSION"

@@ -1,5 +1,6 @@
 FROM busybox
+ARG SERVER_IMAGE
 
-COPY --from=localhost/mattermost-team /mattermost/bin/mmctl /usr/local/bin/mmctl
+COPY --from=${SERVER_IMAGE} /mattermost/bin/mmctl /usr/local/bin/mmctl
 
 CMD ["/usr/local/bin/mmctl"]
