@@ -1,0 +1,5 @@
+FROM busybox
+
+COPY --from=localhost/mattermost-team /mattermost/bin/mmctl /usr/local/bin/mmctl
+
+CMD ["/usr/local/bin/mmctl"]

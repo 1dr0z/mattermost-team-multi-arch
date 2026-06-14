@@ -1,0 +1,30 @@
+--- Containerfile.upstream	2026-05-27 01:16:08.090400338 -0600
++++ Containerfile	2026-05-27 01:22:30.707046041 -0600
+@@ -58,18 +58,20 @@
+ COPY --from=builder /usr/share/wv /usr/share/wv
+
+ # Copy necessary libraries for document processing utilities
+-COPY --from=builder /usr/lib/libpoppler.so* /usr/lib/
+-COPY --from=builder /usr/lib/libfreetype.so* /usr/lib/
+-COPY --from=builder /usr/lib/libpng.so* /usr/lib/
+-COPY --from=builder /usr/lib/libwv.so* /usr/lib/
+-COPY --from=builder /usr/lib/libtidy.so* /usr/lib/
+-COPY --from=builder /usr/lib/libfontconfig.so* /usr/lib/
++COPY --from=builder \
++  /usr/lib/*/libpoppler.so* \
++  /usr/lib/*/libfreetype.so* \
++  /usr/lib/*/libpng*.so* \
++  /usr/lib/*/libwv.so* \
++  /usr/lib/*/libtidy.so* \
++  /usr/lib/*/libfontconfig.so* \
++  /usr/lib/
+
+ # Copy mattermost from builder stage
+ COPY --from=builder --chown=2000:2000 /mattermost /mattermost
+
+ # Copy passwd including mattermost user
+-COPY  passwd /etc/passwd
++COPY --from=builder /etc/passwd /etc/passwd
+
+ # We should refrain from running as privileged user
+ USER mattermost
