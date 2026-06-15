@@ -32,7 +32,7 @@ jobs:
 
   build:
     needs: prepare
-    permissions: { contents: read, packages: write }
+    permissions: { contents: write, packages: read }
     strategy:
       fail-fast: false
       matrix:
