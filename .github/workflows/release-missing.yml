@@ -31,7 +31,7 @@ jobs:
           versions=$(just missing-versions | jq -R . | jq -cs .)
           echo "versions=$versions" >> "$GITHUB_OUTPUT"
 
-  build:
+  release:
     needs: plan
     if: needs.plan.outputs.versions != '[]'
     permissions:

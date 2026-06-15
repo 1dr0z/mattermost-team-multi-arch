@@ -30,19 +30,22 @@ jobs:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just login
 
+      # Patch and cut a release
       - run: just patch "$VERSION"
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dir=$(just _build-dir $VERSION)
+          gh release delete "v${VERSION}" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "v${VERSION}" $dir/Containerfile \
+            --target "$GITHUB_SHA" \
+            --title "mattermost $VERSION" \
+            --notes "mattermost $VERSION" \
+            --latest=false
+
       - run: just build "$VERSION" amd64
       - run: just build "$VERSION" arm64
 
       - run: just assemble "$VERSION"
       - run: just verify-manifests "$VERSION"
       - run: just publish-manifests "$VERSION"
-
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          dir=$(just _build-dir $VERSION)
-          gh release create "v${VERSION}" $dir/Containerfile \
-            --target "$GITHUB_SHA" \
-            --title "mattermost $VERSION" \
-            --latest=false
