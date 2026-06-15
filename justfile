@@ -204,7 +204,7 @@ verify-manifests version:
 
     check() {
         local repo=$1 raw arches
-        raw=$(skopeo inspect {{ registry_tls }} --raw "docker://${repo}:{{ version }}") \
+        raw=$(podman manifest inspect "${repo}:{{ version }}") \
             || { echo "no manifest for ${repo}:{{ version }}" >&2; return 1; }
 
         arches=$(jq -r '.manifests[].platform.architecture' <<<"$raw" | sort -u | paste -sd, -)

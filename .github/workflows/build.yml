@@ -31,8 +31,8 @@ jobs:
     outputs:
       versions: ${{ steps.plan-versions.outputs.versions }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - id: plan-versions
         env:
           FORCE_VERSION: ${{ github.event.inputs.version }}
