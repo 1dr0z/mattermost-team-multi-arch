@@ -74,6 +74,9 @@ jobs:
         run: just login
       - run: just import-images images
       - run: just assemble "$VERSION"
+      - run: just verify-manifests "$VERSION"
+      - run: just push "$VERSION" amd64
+      - run: just push "$VERSION" arm64
       - run: just publish-manifests "$VERSION"
 
   release:
@@ -89,5 +92,4 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
       - uses: extractions/setup-just@v4
-      - run: just verify-manifests "$VERSION"
       - run: just release "$VERSION"
