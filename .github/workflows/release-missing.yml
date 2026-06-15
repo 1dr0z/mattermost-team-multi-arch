@@ -34,6 +34,9 @@ jobs:
   build:
     needs: plan
     if: needs.plan.outputs.versions != '[]'
+    permissions:
+      contents: write
+      packages: write
     strategy:
       fail-fast: false
       matrix:
