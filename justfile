@@ -39,15 +39,22 @@ local-registry-up:
 local-registry-down:
     -podman rm -f mm-registry
 
+_build-dir version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    mkdir -p "build/{{ version }}" >&2
+    echo "build/{{ version }}"
+
 # Fetch and patch the upstream Dockerfile
 patch version:
     #!/usr/bin/env bash
     set -euo pipefail
-
+    dir=`just _build-dir {{ version }}`
     url="https://raw.githubusercontent.com/mattermost/mattermost/refs/tags/v{{ version }}/server/build/Dockerfile"
-    curl -fsSL "$url" -o mattermost/Containerfile.upstream
-    patch --fuzz 0 -o mattermost/Containerfile.patched \
-        mattermost/Containerfile.upstream < mattermost/multi-arch.patch
+    curl -fsSL "$url" -o "$dir/Containerfile.upstream"
+    patch --fuzz 0 -o "$dir/Containerfile" \
+        "$dir/Containerfile.upstream" < mattermost/multi-arch.patch
 
 _server_tag version arch=local_arch:
     @echo "{{ server_repo }}:{{ version }}-{{ arch }}"
@@ -59,14 +66,15 @@ _build-server version target_arch=local_arch:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    pkg="https://releases.mattermost.com/{{ version }}/mattermost-team-{{ version }}-linux-{{ target_arch }}.tar.gz"
+    dir=`just _build-dir {{ version }}`
     tag=`just _server_tag {{ version }} {{ target_arch }}`
+    pkg="https://releases.mattermost.com/{{ version }}/mattermost-team-{{ version }}-linux-{{ target_arch }}.tar.gz"
     podman build \
         --platform "linux/{{ target_arch }}" \
         --format docker \
         --build-arg MM_PACKAGE="$pkg" \
         --tag "$tag" \
-        --file mattermost/Containerfile.patched \
+        --file "$dir/Containerfile" \
         mattermost
 
 _build-mmctl version target_arch=local_arch: (_build-server version target_arch)
@@ -214,12 +222,6 @@ verify-manifests version:
 
     check "{{ server_repo }}"
     check "{{ mmctl_repo }}"
-
-# Create the GitHub release and attach the exact Containerfile used.
-release version sha:
-    gh release create "v{{ version }}" --target "{{ sha }}" \
-      --title "mattermost {{ version }}" --notes "mattermost {{ version }}"
-    gh release upload "v{{ version }}" mattermost/Containerfile.patched
 
 actions *ARGS:
     act schedule \

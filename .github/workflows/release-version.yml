@@ -41,9 +41,8 @@ jobs:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${VERSION}" \
-            mattermost/Containerfile.upstream\
-            mattermost/Containerfile.patched \
+          dir=$(just _build-dir $VERSION)
+          gh release create "v${VERSION}" $dir/Containerfile \
             --target "$GITHUB_SHA" \
             --title "mattermost $VERSION" \
-            --notes "mattermost $VERSION"
+            --latest=false

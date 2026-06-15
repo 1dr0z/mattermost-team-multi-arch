@@ -1,0 +1,43 @@
+name: release-missing
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+
+concurrency:
+  group: release-missing
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      versions: ${{ steps.missing.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
+      - id: missing
+        run: |
+          versions=$(just missing-versions | jq -R . | jq -cs .)
+          echo "versions=$versions" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.versions != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJson(needs.plan.outputs.versions) }}
+    uses: ./.github/workflows/release-version.yml
+    with:
+      version: ${{ matrix.version }}
+    secrets: inherit
