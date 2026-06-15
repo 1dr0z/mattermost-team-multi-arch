@@ -175,7 +175,7 @@ assemble-manifest repo version:
     list="{{ repo }}:{{ version }}"
     podman manifest rm "$list" 2>/dev/null || true
     podman manifest create "$list"
-    podman manifest add "$list" "{{ repo }}:{{ version }}-amd64"   # local if built here, else pulled
+    podman manifest add "$list" "{{ repo }}:{{ version }}-amd64"
     podman manifest add "$list" "{{ repo }}:{{ version }}-arm64"
 
 # Assemble the multi-arch manifests for version

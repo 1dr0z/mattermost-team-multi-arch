@@ -67,6 +67,7 @@ jobs:
           pattern: images-${{ inputs.version }}-*
           path: images/
           merge-multiple: true
+      - run: tree images/
       - env:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
