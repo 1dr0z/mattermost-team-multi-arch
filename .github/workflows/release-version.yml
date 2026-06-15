@@ -12,76 +12,35 @@ env:
   VERSION: ${{ inputs.version }}
 
 jobs:
-  prepare:
-    permissions: { contents: write }
+  release-version:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - uses: extractions/setup-just@v4
       - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-      - name: git config
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-      - name: patch containerfile
-        run: |
-          just patch "$VERSION"
-          git diff --quiet || git commit -a -m "mattermost $VERSION"
-      - run: just release-rc "$VERSION"
+      - uses: extractions/setup-just@v4
+      - uses: docker/setup-qemu-action@v4
 
-  build:
-    needs: prepare
-    permissions: { contents: write, packages: read }
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - { runner: ubuntu-24.04, arch: amd64 }
-          - { runner: ubuntu-24.04-arm, arch: arm64 }
-    runs-on: ${{ matrix.target.runner }}
-    env:
-      ARCH: ${{ matrix.target.arch }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: v${{ inputs.version }}-rc
-          fetch-tags: true
-      - uses: extractions/setup-just@v4
-      - run: just build "$VERSION" "$ARCH"
-      - run: just export-images "$VERSION" "$ARCH" images
-      - uses: actions/upload-artifact@v7
-        with:
-          name: images-${{ inputs.version }}-${{ matrix.target.arch }}
-          path: images/
-          retention-days: 1
-          if-no-files-found: error
-
-  release:
-    needs: build
-    permissions: { contents: write, packages: write }
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: extractions/setup-just@v4
-      - uses: actions/checkout@v5
-        with:
-          ref: v${{ inputs.version }}-rc
-          fetch-tags: true
-      - run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
       - env:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just login
 
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: images-${{ inputs.version }}-*
-          path: images/
-          merge-multiple: true
-      - run: just import-images images
+      - run: just patch "$VERSION"
+      - run: just build "$VERSION" amd64
+      - run: just build "$VERSION" arm64
+
       - run: just assemble "$VERSION"
       - run: just verify-manifests "$VERSION"
       - run: just publish-manifests "$VERSION"
-      - run: just release "$VERSION"
+
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${VERSION}" \
+            mattermost/Containerfile.upstream\
+            mattermost/Containerfile.patched \
+            --target "$GITHUB_SHA" \
+            --title "mattermost $VERSION" \
+            --notes "mattermost $VERSION"

@@ -215,26 +215,11 @@ verify-manifests version:
     check "{{ server_repo }}"
     check "{{ mmctl_repo }}"
 
-# Tag and push a release candidate
-release-rc version:
-    git tag "v{{ version }}-rc"
-    git push --force origin "v{{ version }}-rc"
-
-# Tag and push a release version
-release version: (verify-manifests version)
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    tag="v{{ version }}"
-    rc_tag="v{{ version }}-rc"
-
-    # create release tag
-    git tag -a "$tag" -m "mattermost {{ version }}" "$rc_tag"
-    git push origin "$tag"
-
-    # delete release candidate tag
-    git tag -d "$rc_tag"
-    git push origin ":${rc_tag}"
+# Create the GitHub release and attach the exact Containerfile used.
+release version sha:
+    gh release create "v{{ version }}" --target "{{ sha }}" \
+      --title "mattermost {{ version }}" --notes "mattermost {{ version }}"
+    gh release upload "v{{ version }}" mattermost/Containerfile.patched
 
 actions *ARGS:
     act schedule \
