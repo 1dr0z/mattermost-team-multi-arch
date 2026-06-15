@@ -76,7 +76,7 @@ jobs:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just login
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           pattern: images-${{ inputs.version }}-*
           path: images/
@@ -84,8 +84,5 @@ jobs:
       - run: just import-images images
       - run: just assemble "$VERSION"
       - run: just verify-manifests "$VERSION"
-
-      - run: just push "$VERSION" amd64
-      - run: just push "$VERSION" arm64
       - run: just publish-manifests "$VERSION"
       - run: just release "$VERSION"

@@ -36,6 +36,7 @@
                 pkgs.gum
 
                 pkgs.act
+                pkgs.skopeo
               ];
             };
 

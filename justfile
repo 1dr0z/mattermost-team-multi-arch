@@ -1,8 +1,8 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 registry := env("REGISTRY", "ghcr.io")
-server_image := env("SERVER_IMAGE", "mattermost-team")
-mmctl_image := env("MMCTL_IMAGE", "mattermost-mmctl")
+server_image := env("SERVER_IMAGE", "1dr0z/mattermost-team")
+mmctl_image := env("MMCTL_IMAGE", "1dr0z/mattermost-mmctl")
 server_repo := registry + "/" + lowercase(server_image)
 mmctl_repo := registry + "/" + lowercase(mmctl_image)
 
