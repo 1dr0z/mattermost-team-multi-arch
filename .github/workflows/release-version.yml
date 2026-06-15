@@ -43,7 +43,6 @@ jobs:
     env:
       ARCH: ${{ matrix.target.arch }}
     steps:
-      - uses: extractions/setup-just@v4
       - uses: actions/checkout@v5
         with:
           ref: v${{ inputs.version }}-rc
@@ -51,7 +50,7 @@ jobs:
       - uses: extractions/setup-just@v4
       - run: just build "$VERSION" "$ARCH"
       - run: just export-images "$VERSION" "$ARCH" images
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: images-${{ inputs.version }}-${{ matrix.target.arch }}
           path: images/
@@ -76,7 +75,7 @@ jobs:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just login
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           pattern: images-${{ inputs.version }}-*
           path: images/

@@ -37,6 +37,7 @@
 
                 pkgs.act
                 pkgs.skopeo
+                pkgs.gh
               ];
             };
 
