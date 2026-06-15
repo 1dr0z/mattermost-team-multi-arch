@@ -74,7 +74,7 @@ _build-mmctl version target_arch=local_arch: (_build-server version target_arch)
     set -euo pipefail
 
     server_tag=`just _server_tag {{ version }} {{ target_arch }}`
-    mmctl_tag=`just _mmctl_tag {{ version }}-{{ target_arch }}`
+    mmctl_tag=`just _mmctl_tag {{ version }} {{ target_arch }}`
     podman build \
         --platform "linux/{{ target_arch }}" \
         --format docker \

@@ -22,7 +22,7 @@ jobs:
       - run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       - run: |
           just patch "$VERSION"
           git diff --quiet || git commit -a -m "mattermost $VERSION"
@@ -45,7 +45,7 @@ jobs:
         with:
           ref: v${{ inputs.version }}-rc
           fetch-tags: true
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       - run: just build "$VERSION" "$ARCH"
       - run: just export-images "$VERSION" "$ARCH" images
       - uses: actions/upload-artifact@v4
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: images-${{ inputs.version }}-*
@@ -71,7 +71,7 @@ jobs:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just login
-      - run: just load images
+      - run: just import-images images
       - run: just assemble "$VERSION"
       - run: just publish-manifests "$VERSION"
 
@@ -87,6 +87,6 @@ jobs:
       - run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       - run: just verify-manifests "$VERSION"
       - run: just release "$VERSION"
