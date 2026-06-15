@@ -3,7 +3,10 @@ name: release-version
 on:
   workflow_call:
     inputs:
-      version: { required: true, type: string }
+      version: { type: string, required: true }
+  workflow_dispatch:
+    inputs:
+      version: { type: string, required: false }
 
 env:
   REGISTRY: ghcr.io
