@@ -175,8 +175,8 @@ assemble-manifest repo version:
     list="{{ repo }}:{{ version }}"
     podman manifest rm "$list" 2>/dev/null || true
     podman manifest create "$list"
-    podman manifest add "$list" "{{ repo }}:{{ version }}-amd64"
-    podman manifest add "$list" "{{ repo }}:{{ version }}-arm64"
+    podman manifest add "$list" "containers-storage:{{ repo }}:{{ version }}-amd64"
+    podman manifest add "$list" "containers-storage:{{ repo }}:{{ version }}-arm64"
 
 # Assemble the multi-arch manifests for version
 assemble version: (assemble-manifest server_repo version) (assemble-manifest mmctl_repo version)
