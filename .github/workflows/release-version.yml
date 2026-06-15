@@ -60,7 +60,7 @@ jobs:
 
   release:
     needs: build
-    permissions: { contents: read, packages: write }
+    permissions: { contents: write, packages: write }
     runs-on: ubuntu-24.04
     steps:
       - uses: extractions/setup-just@v4
